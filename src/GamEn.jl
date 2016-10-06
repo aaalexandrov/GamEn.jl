@@ -1,5 +1,10 @@
 module GamEn
 
-# package code goes here
+import GRU
+import JSON
 
-end # module
+include("Engine.jl")
+include("Object.jl")
+include("World.jl")
+
+end
