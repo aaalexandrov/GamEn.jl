@@ -1,2 +1,2 @@
-type World
+type World <: NodeObj
 end
