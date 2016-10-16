@@ -21,5 +21,3 @@ end
 get_children(parent::NodeObj, typ::Type) = filter(c->isa(c, typ), parent.children)
 
 hasposition(obj::BaseObj) = false
-
-getbound(obj::BaseObj) = Shapes.AABB(0.0, 0.0, 0.0, -1.0, -1.0, -1.0) # empty bound

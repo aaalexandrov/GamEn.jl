@@ -3,6 +3,8 @@ module Octree
 using Shapes
 using Shapes: intersect, isvalid
 
+export Tree, add, remove, for_overlapping
+
 type Node{T}
   subNodes::Array{Nullable{Node{T}}, 3}
   objects::Array{T, 1}
