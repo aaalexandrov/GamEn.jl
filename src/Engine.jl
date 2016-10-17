@@ -71,17 +71,31 @@ end
 resource_unload(engine::Engine, gruResource::GRU.Resource) = GRU.done(gruResource)
 resource_unload(engine::Engine, ::Any) = nothing
 
-function load_def(engine::Engine, defname::String)
+function get_def(engine::Engine, defname::String)
 	path = split(defname, '/')
 	container = engine.defs
 	for i = 1:length(path)-1
 		container = get!(container, path[i]) do; Dict{String, Any}() end
 	end
 	def = get!(container, path[end]) do
-		JSON.parsefile(joinpath(engine.datapath, defname*".json"))
+		json = JSON.parsefile(joinpath(engine.datapath, defname*".json"))
+		if haskey(json, "type")
+			json["type"] = eval(parse(json["type"]))::DataType
+		end
 	end
-	objType = eval(parse(def["type"]))
+	def
+end
+
+function load_def(engine::Engine, defname::String) = load_def(engine, get_def(engine, defname))
+
+function load_def(engine::Engine, def::Dict{String, Any})
+	def = get_def(engine, defname)
+	objType = def["type"]
 	obj = objType()
 	init(obj, def)
 	obj
+end
+
+function init(obj::Any, def::Dict{String, Any})
+
 end
