@@ -1,11 +1,11 @@
 type Engine
 	renderer::GRU.Renderer
-	defs::Dict{String, Any}
+	defs::Dict{Symbol, Any}
 	dataPath::String
 	resources::Dict{Symbol, Any}
 	resourceTypes::Dict{String, DataType}
 
-	Engine(dataPath::String) = new(GRU.Renderer(), Dict{String, Any}(), dataPath)
+	Engine(dataPath::String) = new(GRU.Renderer(), Dict{Symbol, Any}(), dataPath, Dict{Symbol, Any}(), Dict{String, DataType}())
 end
 
 function init(engine::Engine)
@@ -52,7 +52,7 @@ end
 
 resource_id(::Any, filename::String, args...) = filename * reduce((v1, v2)->"$(v1)_$v2", "", args)
 
-function resource_load(engine::Engine. ::Type{GRU.Shader}, filename::String)
+function resource_load(engine::Engine, ::Type{GRU.Shader}, filename::String)
 	shader = GRU.Shader()
 	GRU.init(shader, engine.Renderer, filename)
 	shader
@@ -71,31 +71,44 @@ end
 resource_unload(engine::Engine, gruResource::GRU.Resource) = GRU.done(gruResource)
 resource_unload(engine::Engine, ::Any) = nothing
 
+function resolve_def(engine::Engine, defpath::String, def::Dict{Symbol, Any})
+	if haskey(def, :type)
+		def[:type] = eval(parse(def[:type]))::DataType
+	end
+	def[:defpath] = defpath
+end
+
 function get_def(engine::Engine, defname::String)
 	path = split(defname, '/')
 	container = engine.defs
 	for i = 1:length(path)-1
-		container = get!(container, path[i]) do; Dict{String, Any}() end
+		container = get!(container, path[i]) do; Dict{Symbol, Any}() end
 	end
 	def = get!(container, path[end]) do
 		json = JSON.parsefile(joinpath(engine.datapath, defname*".json"))
-		if haskey(json, "type")
-			json["type"] = eval(parse(json["type"]))::DataType
-		end
+		resolve_def(engine, defname, json)
 	end
 	def
 end
 
-function load_def(engine::Engine, defname::String) = load_def(engine, get_def(engine, defname))
+load_def(engine::Engine, defname::String) = load_def(engine, get_def(engine, defname))
 
-function load_def(engine::Engine, def::Dict{String, Any})
+function load_def(engine::Engine, def::Dict{Symbol, Any})
 	def = get_def(engine, defname)
-	objType = def["type"]
-	obj = objType()
-	init(obj, def)
-	obj
+	objType = def[:type]
+	init(engine, objType, def)
 end
 
-function init(obj::Any, def::Dict{String, Any})
-
+function init{T}(engine::Engine, obj::T, def::Dict{Symbol, Any})
+	for i = 1:nfields(T)
+		field = fieldname(T, i)
+		if haskey(def, field)
+			val = def[field]
+			if isa(val, Dict{Symbol, Any}) && haskey(val, :type) && val[:type] <: fieldtype(T, i)
+				setfield!(obj, field, load_def(engine, val))
+			else
+				setfield!(obj, field, val)
+			end
+		end
+	end
 end
