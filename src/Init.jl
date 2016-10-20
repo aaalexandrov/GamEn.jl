@@ -44,7 +44,7 @@ function init(engine::Engine, ::Type{GRU.Mesh}, def::Dict{Symbol, Any})::GRU.Mes
 			smooth = eval(parse(smooth))::ObjGeom.SMOOTHING
 			def[:smoothing] = smooth
 		end
-		id = Symbol("$shape_$sides_$(Int(smooth))")
+		id = Symbol(asset_id(shape, sides, Int(smooth)))
 		if GRU.has_resource(engine.renderer, id)
 			return GRU.get_resource(engine.renderer, id)
 		end
@@ -55,10 +55,9 @@ function init(engine::Engine, ::Type{GRU.Mesh}, def::Dict{Symbol, Any})::GRU.Mes
 end
 
 function init(engine::Engine, ::Type{GRU.Material}, def::Dict{Symbol, Any})::GRU.Material
-	id = def[:defpath]
 	shader = load_def(engine, def[:shader])
 	material = GRU.Material(shader)
-	if hasvalue(def, :uniforms)
+	if haskey(def, :uniforms)
 		for (u, v) in def[:uniforms]
 			GRU.setuniform(material, Symbol(u), v)
 		end
@@ -66,8 +65,26 @@ function init(engine::Engine, ::Type{GRU.Material}, def::Dict{Symbol, Any})::GRU
 	material
 end
 
-function init(engine::Engine, ::Type{GRU.Model}, def::Dict{Symbol, Any})
+function init(engine::Engine, ::Type{GRU.Model}, def::Dict{Symbol, Any})::GRU.Model
+	mesh = load_def(engine, def[:mesh])
+	material = load_def(engine, def[:material])
+	GRU.Model(mesh, material)
 end
 
-function init(engine::Engine, ::Type{GRU.Font}, def::Dict{Symbol, Any})
+function init(engine::Engine, ::Type{GRU.Font}, def::Dict{Symbol, Any})::GRU.Font
+	facename = def[:facename]
+	sizeXY = get(def, :sizexy, (32, 32))
+	faceIndex = get(def, :faceindex, 0)
+	chars = get(def, :chars, chars = '\u0000':'\u00ff')
+	ftFont = FTFont.loadfont(facename, sizeXY = sizeXY, faceIndex = faceIndex, chars = chars)
+
+	shader = load_def(engine, def[:shader])
+	positionFunc = get(def, :positionfn, GRU.position_func(:position))
+	if !isa(positionFunc, Function)
+		positionFunc = eval(parse(positionFunc))::Function
+		def[:positionfn] = positionFunc
+	end
+	textureUniform = Symbol(get(def, :texture_uniform, :diffuseTexture))
+	maxCharacters = get(def, :maxchars, 2048)
+	GRU.init(GRU.Font(), ftFont, shader, positionFunc = positionFunc, textureUniform = textureUniform, maxCharacters = maxCharacters)
 end
