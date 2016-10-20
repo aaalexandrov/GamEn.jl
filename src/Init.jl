@@ -48,7 +48,7 @@ function init(engine::Engine, ::Type{GRU.Mesh}, def::Dict{Symbol, Any})::GRU.Mes
 		if GRU.has_resource(engine.renderer, id)
 			return GRU.get_resource(engine.renderer, id)
 		end
-		model = shape == "prism"? ObjGeom.prism(sides; smooth = smooth)? (shape == "pyramid"? ObjGeom.pyramid(sides; smooth = smooth): ObjGeom.sphere(sides; smooth = smooth))
+		model = shape == "prism"? ObjGeom.prism(sides; smooth = smooth): (shape == "pyramid"? ObjGeom.pyramid(sides; smooth = smooth): ObjGeom.sphere(sides; smooth = smooth))
 	end
 	streams, indices = ObjGeom.get_indexed(model)
 	GRU.init(GRU.Mesh(), engine.renderer, streams, map(UInt16, indices), positionFunc = GRU.position_func(:position), id = id)
