@@ -3,13 +3,20 @@ type Engine
 	defs::Dict{Symbol, Any}
 	dataPath::String
 	assets::Dict{Symbol, Any}
+	events::Dict{Symbol, Vector{Function}}
+	shouldClose::Bool
+	window::GLFW.Window
 
-	Engine(dataPath::String) = new(GRU.Renderer(), Dict{Symbol, Any}(), dataPath, Dict{Symbol, Any}())
+	Engine(dataPath::String) = new(GRU.Renderer(), Dict{Symbol, Any}(), dataPath, Dict{Symbol, Any}(), Dict{Symbol, Vector{Function}}(), false)
 end
 
 function init(engine::Engine)
+	init_window(engine)
 	GRU.init(renderer)
 	FTFont.init()
+	GLHelper.gl_info()
+
+	init_viewport(engine)
 end
 
 function done(engine::Engine)
@@ -20,7 +27,40 @@ function done(engine::Engine)
 
 	FTFont.done()
 	GRU.done(renderer)
+	done_window(engine)
 end
+
+should_close(engine::Engine) = engine.shouldClose || GLFW.WindowShouldClose(engine.window)
+
+function run(engine::Engine)
+	while !should_close(engine)
+		render(engine.renderer)
+		call_event(engine, :update)
+
+		GLFW.SwapBuffers(engine.window)
+		GLFW.PollEvents()
+
+		call_event(engine, :input)
+
+		yield()
+	end
+end
+
+function add_event(engine::Engine, event::Symbol, handler::Function)
+	handlers = get!(engine.events, event) do; Function[] end
+	push!(handlers, handler)
+end
+
+function remove_event(engine::Engine, event::Symbol, handler::Function)
+	handlers = engine.events[event]
+	filter!(handlers) do h h==handler end
+end
+
+function call_event(engine::Engine, event::Symbol, args...)
+	foreach(handlers) do h h(engine, event, args...) end
+end
+
+asset_path(engine::Engine, path::String) = joinpath(engine.dataPath, path)
 
 asset_id(::Any, filename::String, args...) = filename * reduce((v1, v2)->"$(v1)_$v2", "", args)
 
@@ -84,8 +124,12 @@ function init{T}(engine::Engine, ::Type{T}, def::Dict{Symbol, Any})
 					def[field] = reference
 				end
 			end
-			if isa(val, Dict{Symbol, Any}) && haskey(val, :type) && val[:type] <: fieldtype(T, i)
-				setfield!(obj, field, load_def(engine, val))
+			dstType = fieldtype(T, i)
+			if isa(val, Dict{Symbol, Any}) && haskey(val, :type) && val[:type] <: dstType
+				val = load_def(engine, val)
+			end
+			if dstType <: AbstractArray
+				copy!(getfield(obj, field), val)
 			else
 				setfield!(obj, field, val)
 			end

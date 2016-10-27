@@ -15,7 +15,7 @@ function init(engine::Engine, ::Type{GRU.Shader}, def::Dict{Symbol, Any})::GRU.S
 		setupFn = eval(parse(setupFn))::Function
 		def[:setupfn] = setupFn
 	end
-	GRU.init(GRU.Shader(), engine.renderer, path, setupMaterial = setupFn)
+	GRU.init(GRU.Shader(), engine.renderer, asset_path(engine, path), setupMaterial = setupFn)
 end
 
 function init(engine::Engine, ::Type{GRU.Texture}, def::Dict{Symbol, Any})::GRU.Texture
@@ -24,7 +24,7 @@ function init(engine::Engine, ::Type{GRU.Texture}, def::Dict{Symbol, Any})::GRU.
 	if GRU.has_resource(engine.renderer, id)
 		return GRU.get_resource(engine.renderer, id)
 	end
-	GRU.init(GRU.Texture(), engine.renderer, path)
+	GRU.init(GRU.Texture(), engine.renderer, asset_path(engine, path))
 end
 
 function init(engine::Engine, ::Type{GRU.Mesh}, def::Dict{Symbol, Any})::GRU.Mesh
@@ -35,7 +35,7 @@ function init(engine::Engine, ::Type{GRU.Mesh}, def::Dict{Symbol, Any})::GRU.Mes
 		if GRU.has_resource(engine.renderer, id)
 			return GRU.get_resource(engine.renderer, id)
 		end
-		model = ObjGeom.load_obj(path)
+		model = ObjGeom.load_obj(asset_path(engine, path))
 	else
 		shape = def[:shape]
 		sides = get(def, :sides, 4)
@@ -48,7 +48,20 @@ function init(engine::Engine, ::Type{GRU.Mesh}, def::Dict{Symbol, Any})::GRU.Mes
 		if GRU.has_resource(engine.renderer, id)
 			return GRU.get_resource(engine.renderer, id)
 		end
-		model = shape == "prism"? ObjGeom.prism(sides; smooth = smooth): (shape == "pyramid"? ObjGeom.pyramid(sides; smooth = smooth): ObjGeom.sphere(sides; smooth = smooth))
+		model =
+			if shape == "prism"
+				ObjGeom.prism(sides; smooth = smooth)
+			elseif shape == "pyramid"
+				ObjGeom.pyramid(sides; smooth = smooth)
+			elseif shape == "sphere"
+				ObjGeom.sphere(sides; smooth = smooth)
+			elseif shape == "regularpoly"
+				ObjGeom.regularpoly(sides)
+			end
+	end
+	if haskey(def, :project_texcoord)
+		direction = def[:project_texcoord]
+		ObjGeom.add_texcoord(model, direction)
 	end
 	streams, indices = ObjGeom.get_indexed(model)
 	GRU.init(GRU.Mesh(), engine.renderer, streams, map(UInt16, indices), positionFunc = GRU.position_func(:position), id = id)
@@ -58,8 +71,22 @@ function init(engine::Engine, ::Type{GRU.Material}, def::Dict{Symbol, Any})::GRU
 	shader = load_def(engine, def[:shader])
 	material = GRU.Material(shader)
 	if haskey(def, :uniforms)
-		for (u, v) in def[:uniforms]
-			GRU.setuniform(material, Symbol(u), v)
+		uniforms = def[:uniforms]
+		for (u, v) in uniforms
+			if isa(v, String) || isa(v, Dict)
+				v = load_def(engine, v)
+				uniforms[u] = v
+			end
+			GRU.setuniform(material, u, v)
+		end
+	end
+	if haskey(def, :states)
+		states = def[:states]
+		for i = 1:length(states)
+			if !isa(states[i], GRU.RenderState)
+				states[i] = eval(parse(states[i]))::GRU.RenderState
+			end
+			GRU.setstate(material, states[i])
 		end
 	end
 	material
@@ -76,7 +103,7 @@ function init(engine::Engine, ::Type{GRU.Font}, def::Dict{Symbol, Any})::GRU.Fon
 	sizeXY = get(def, :sizexy, (32, 32))
 	faceIndex = get(def, :faceindex, 0)
 	chars = get(def, :chars, chars = '\u0000':'\u00ff')
-	ftFont = FTFont.loadfont(facename, sizeXY = sizeXY, faceIndex = faceIndex, chars = chars)
+	ftFont = FTFont.loadfont(asset_path(engine, facename), sizeXY = sizeXY, faceIndex = faceIndex, chars = chars)
 
 	shader = load_def(engine, def[:shader])
 	positionFunc = get(def, :positionfn, GRU.position_func(:position))
