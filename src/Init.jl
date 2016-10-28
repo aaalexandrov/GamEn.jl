@@ -67,9 +67,7 @@ function init(engine::Engine, ::Type{GRU.Mesh}, def::Dict{Symbol, Any})::GRU.Mes
 	GRU.init(GRU.Mesh(), engine.renderer, streams, map(UInt16, indices), positionFunc = GRU.position_func(:position), id = id)
 end
 
-function init(engine::Engine, ::Type{GRU.Material}, def::Dict{Symbol, Any})::GRU.Material
-	shader = load_def(engine, def[:shader])
-	material = GRU.Material(shader)
+function init_material(engine::Engine, material::GRU.Material, def::Dict{Symbol, Any})
 	if haskey(def, :uniforms)
 		uniforms = def[:uniforms]
 		for (u, v) in uniforms
@@ -92,10 +90,33 @@ function init(engine::Engine, ::Type{GRU.Material}, def::Dict{Symbol, Any})::GRU
 	material
 end
 
+function init(engine::Engine, ::Type{GRU.Material}, def::Dict{Symbol, Any})::GRU.Material
+	shader = load_def(engine, def[:shader])
+	init_material(engine, GRU.Material(shader), def)
+end
+
 function init(engine::Engine, ::Type{GRU.Model}, def::Dict{Symbol, Any})::GRU.Model
 	mesh = load_def(engine, def[:mesh])
 	material = load_def(engine, def[:material])
-	GRU.Model(mesh, material)
+	model = GRU.Model(mesh, material)
+	if haskey(def, :transform)
+		GRU.settransform(model, def[:transform])
+	else
+		mat = eye(Float32, 4)
+		if haskey(def, :scale)
+			mat = Math3D.scale(def[:scale])
+		end
+		if haskey(def, :rot_axis_angle)
+			axis = def[:rot_axis_angle][1:3]
+			angle = def[:rot_axis_angle][4]
+			mat = Math3D.rot(axis, angle) * mat
+		end
+		if haskey(def, :position)
+			mat = Math3D.trans(def[:position]) * mat
+		end
+		GRU.settransform(model, mat)
+	end
+	model
 end
 
 function init(engine::Engine, ::Type{GRU.Font}, def::Dict{Symbol, Any})::GRU.Font
@@ -113,5 +134,7 @@ function init(engine::Engine, ::Type{GRU.Font}, def::Dict{Symbol, Any})::GRU.Fon
 	end
 	textureUniform = Symbol(get(def, :texture_uniform, :diffuseTexture))
 	maxCharacters = get(def, :maxchars, 2048)
-	GRU.init(GRU.Font(), ftFont, shader, positionFunc = positionFunc, textureUniform = textureUniform, maxCharacters = maxCharacters)
+	font = GRU.init(GRU.Font(), ftFont, shader, positionFunc = positionFunc, textureUniform = textureUniform, maxCharacters = maxCharacters)
+	init_material(engine, font.model.material, def)
+	font
 end

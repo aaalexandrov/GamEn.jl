@@ -5,9 +5,14 @@ type Engine
 	assets::Dict{Symbol, Any}
 	events::Dict{Symbol, Vector{Function}}
 	shouldClose::Bool
+	timePrev::Float64
+	timeNow::Float64
 	window::GLFW.Window
 
-	Engine(dataPath::String) = new(GRU.Renderer(), Dict{Symbol, Any}(), dataPath, Dict{Symbol, Any}(), Dict{Symbol, Vector{Function}}(), false)
+	function Engine(dataPath::String)
+		now = time()
+		new(GRU.Renderer(), Dict{Symbol, Any}(), dataPath, Dict{Symbol, Any}(), Dict{Symbol, Vector{Function}}(), false, now, now)
+	 end
 end
 
 function init(engine::Engine)
@@ -15,8 +20,6 @@ function init(engine::Engine)
 	GRU.init(renderer)
 	FTFont.init()
 	GLHelper.gl_info()
-
-	init_viewport(engine)
 end
 
 function done(engine::Engine)
@@ -32,26 +35,43 @@ end
 
 should_close(engine::Engine) = engine.shouldClose || GLFW.WindowShouldClose(engine.window)
 
+function render(engine::Engine)
+	call_event(engine, :render)
+	GRU.render_frame(engine.renderer)
+end
+
+function update(engine::Engine)
+	engine.timePrev = engine.timeNow
+	engine.timeNow = time()
+	call_event(engine, :update)
+end
+
+function input(engine::Engine)
+	GLFW.PollEvents()
+	call_event(engine, :input)
+end
+
 function run(engine::Engine)
+	init_viewport(engine)
+
 	while !should_close(engine)
-		render(engine.renderer)
-		call_event(engine, :update)
+		render(engine)
+		update(engine)
 
 		GLFW.SwapBuffers(engine.window)
-		GLFW.PollEvents()
 
-		call_event(engine, :input)
+		input(engine)
 
 		yield()
 	end
 end
 
-function add_event(engine::Engine, event::Symbol, handler::Function)
+function add_event(handler::Function, engine::Engine, event::Symbol)
 	handlers = get!(engine.events, event) do; Function[] end
 	push!(handlers, handler)
 end
 
-function remove_event(engine::Engine, event::Symbol, handler::Function)
+function remove_event(handler::Function, engine::Engine, event::Symbol)
 	handlers = engine.events[event]
 	filter!(handlers) do h h==handler end
 end
