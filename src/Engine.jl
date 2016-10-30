@@ -17,7 +17,7 @@ end
 
 function init(engine::Engine)
 	init_window(engine)
-	GRU.init(renderer)
+	GRU.init(engine.renderer)
 	FTFont.init()
 	GLHelper.gl_info()
 end
@@ -29,7 +29,7 @@ function done(engine::Engine)
 	end
 
 	FTFont.done()
-	GRU.done(renderer)
+	GRU.done(engine.renderer)
 	done_window(engine)
 end
 
@@ -77,12 +77,13 @@ function remove_event(handler::Function, engine::Engine, event::Symbol)
 end
 
 function call_event(engine::Engine, event::Symbol, args...)
+	handlers = get!(engine.events, event) do; Function[] end
 	foreach(handlers) do h h(engine, event, args...) end
 end
 
 asset_path(engine::Engine, path::String) = joinpath(engine.dataPath, path)
 
-asset_id(::Any, filename::String, args...) = filename * reduce((v1, v2)->"$(v1)_$v2", "", args)
+asset_id(filename::String, args...) = filename * reduce((v1, v2)->"$(v1)_$v2", "", args)
 
 function add_asset(engine::Engine, id::Symbol, val)
 	@assert !haskey(engine.assets, id)
@@ -93,26 +94,39 @@ function remove_asset(engine, id)
 	delete!(engine.assets, id)
 end
 
-function resolve_def(engine::Engine, defpath::String, def::Dict{Symbol, Any})
-	if haskey(def, :type)
-		def[:type] = eval(parse(def[:type]))::DataType
+function set_typed(val, def::Dict{Symbol, Any}, key::Symbol, dataType::DataType)
+	if !isa(val, dataType)
+		if isa(val, String) && !(dataType <: AbstractString || dataType == Symbol)
+			val = eval(parse(val))
+		end
+		val = dataType(val)
+		def[key] = val
 	end
+	val
+end
+
+get_typed(def::Dict{Symbol, Any}, key::Symbol, dataType::DataType) = set_typed(def[key], def, key, dataType)
+get_typed!(default::Function, def::Dict{Symbol, Any}, key::Symbol, dataType::DataType) = set_typed(get!(default, def, key), def, key, dataType)
+get_typed!(def::Dict{Symbol, Any}, key::Symbol, defVal, dataType::DataType = typeof(defVal)) = set_typed(get!(()->defVal, def, key), def, key, dataType)
+
+function resolve_def(engine::Engine, defpath::String, def::Dict{Symbol, Any})
 	def[:defpath] = defpath
 end
 
 function get_def(engine::Engine, defname::String)
-	path = split(defname, '/')
+	path = map(Symbol, split(defname, '/'))
 	container = engine.defs
 	for i = 1:length(path)-1
 		container = get!(container, path[i]) do; Dict{Symbol, Any}() end
 	end
 	def = get!(container, path[end]) do
-		filename = joinpath(engine.datapath, defname*".json")
+		filename = joinpath(engine.dataPath, defname*".json")
 		if !isfile(filename)
 			return nothing
 		end
-		json = JSON.parsefile(filename)
+		json = JSON.parsefile(filename, dicttype=Dict{Symbol, Any})
 		resolve_def(engine, defname, json)
+		json
 	end
 	def
 end
@@ -120,10 +134,9 @@ end
 load_def(engine::Engine, defname::String) = load_def(engine, get_def(engine, defname))
 
 function load_def(engine::Engine, def::Dict{Symbol, Any})
-	def = get_def(engine, defname)
 	instance = get(def, :instance, false)
 	!isa(instance, Bool) && return instance
-	objType = def[:type]
+	objType = get_typed(def, :type, DataType)
 	obj = init(engine, objType, def)
 	if instance == true
 		def[:instance] = obj
@@ -139,13 +152,13 @@ function init{T}(engine::Engine, ::Type{T}, def::Dict{Symbol, Any})
 			val = def[field]
 			if isa(val, String)
 				reference = get_def(engine, val)
-				if isa(reference, Dict{Symbol, Any}) && haskey(val, :type) && val[:type] <: fieldtype(T, i)
+				if isa(reference, Dict{Symbol, Any}) && haskey(val, :type) && get_typed(val, :type, DataType) <: fieldtype(T, i)
 					val = reference
 					def[field] = reference
 				end
 			end
 			dstType = fieldtype(T, i)
-			if isa(val, Dict{Symbol, Any}) && haskey(val, :type) && val[:type] <: dstType
+			if isa(val, Dict{Symbol, Any}) && haskey(val, :type) && vget_typed(val, :type, DataType) <: dstType
 				val = load_def(engine, val)
 			end
 			if dstType <: AbstractArray

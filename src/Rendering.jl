@@ -15,7 +15,7 @@ end
 
 function init_viewport(engine::Engine)
 	set_viewport(engine, GLFW.GetFramebufferSize(engine.window)...)
-	GLFW.SetFramebufferSizeCallback(engine.window, (win::GLFW.Window, width::Cint, height::Cint) -> setViewport(engine, width, height))
+	GLFW.SetFramebufferSizeCallback(engine.window, (win::GLFW.Window, width::Cint, height::Cint) -> set_viewport(engine, width, height))
 end
 
 function set_viewport(engine::Engine, width::Integer, height::Integer)
