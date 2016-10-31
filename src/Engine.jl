@@ -15,9 +15,12 @@ type Engine
 	end
 end
 
-function init(engine::Engine)
-	init_window(engine)
+init(engine::Engine, defname::String) = init(engine, json_load(asset_path(engine, defname*".json")))
+
+function init(engine::Engine, def::Dict{Symbol, Any} = Dict{Symbol, Any}())
+	init_window(engine, def)
 	GRU.init(engine.renderer)
+	init(engine.renderer, def)
 	FTFont.init()
 	GLHelper.gl_info()
 end
@@ -115,6 +118,8 @@ function resolve_def(engine::Engine, defpath::String, def::Dict{Symbol, Any})
 	def[:defpath] = defpath
 end
 
+json_load(path::String) = JSON.parsefile(path, dicttype=Dict{Symbol, Any})
+
 function get_def(engine::Engine, defname::String)
 	path = map(Symbol, split(defname, '/'))
 	container = engine.defs
@@ -122,11 +127,11 @@ function get_def(engine::Engine, defname::String)
 		container = get!(container, path[i]) do; Dict{Symbol, Any}() end
 	end
 	def = get!(container, path[end]) do
-		filename = joinpath(engine.dataPath, defname*".json")
+		filename = asset_path(engine, defname*".json")
 		if !isfile(filename)
 			return nothing
 		end
-		json = JSON.parsefile(filename, dicttype=Dict{Symbol, Any})
+		json = json_load(filename)
 		resolve_def(engine, defname, json)
 		json
 	end

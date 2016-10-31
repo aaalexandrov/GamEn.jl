@@ -1,7 +1,13 @@
-function init(engine::Engine, def::Dict{Symbol, Any})
-end
-
-function init(engine::Engine, ::Type{GRU.Renderer}, def::Dict{Symbol, Any})
+function init(renderer::GRU.Renderer, def::Dict{Symbol, Any})
+	if haskey(def, :clear_color)
+		GRU.set_clear_color(renderer, (def[:clear_color]...))
+	end
+	if haskey(def, :clear_stencil)
+		GRU.set_clear_stencil(renderer, def[:clear_stencil])
+	end
+	if haskey(def, :clear_depth)
+		GRU.set_clear_depth(renderer, def[:clear_depth])
+	end
 end
 
 function init(engine::Engine, ::Type{GRU.Shader}, def::Dict{Symbol, Any})::GRU.Shader
