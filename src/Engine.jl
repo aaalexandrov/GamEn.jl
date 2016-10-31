@@ -12,7 +12,7 @@ type Engine
 	function Engine(dataPath::String)
 		now = time()
 		new(GRU.Renderer(), Dict{Symbol, Any}(), dataPath, Dict{Symbol, Any}(), Dict{Symbol, Vector{Function}}(), false, now, now)
-	 end
+	end
 end
 
 function init(engine::Engine)
@@ -39,6 +39,8 @@ function render(engine::Engine)
 	call_event(engine, :render)
 	GRU.render_frame(engine.renderer)
 end
+
+deltatime(engine::Engine) = engine.timeNow - engine.timePrev
 
 function update(engine::Engine)
 	engine.timePrev = engine.timeNow
