@@ -9,7 +9,6 @@ function init(engine::Engine, ::Type{GRU.Shader}, def::Dict{Symbol, Any})::GRU.S
 	assetPath = asset_path(engine, path)
 	id = Symbol(assetPath)
 	if GRU.has_resource(engine.renderer, id)
-		info("Reusing $id")
 		return GRU.get_resource(engine.renderer, id)
 	end
 	setupFn = get_typed!(def, :setupfn, identity, Function)
@@ -21,7 +20,6 @@ function init(engine::Engine, ::Type{GRU.Texture}, def::Dict{Symbol, Any})::GRU.
 	assetPath = asset_path(engine, path)
 	id = Symbol(assetPath)
 	if GRU.has_resource(engine.renderer, id)
-		info("Reusing $id")
 		return GRU.get_resource(engine.renderer, id)
 	end
 	GRU.init(GRU.Texture(), engine.renderer, assetPath)
@@ -34,7 +32,6 @@ function init(engine::Engine, ::Type{GRU.Mesh}, def::Dict{Symbol, Any})::GRU.Mes
 		assetPath = asset_path(engine, path)
 		id = Symbol(assetPath)
 		if GRU.has_resource(engine.renderer, id)
-			info("Reusing $id")
 			return GRU.get_resource(engine.renderer, id)
 		end
 		model = ObjGeom.load_obj(assetPath)
@@ -44,7 +41,6 @@ function init(engine::Engine, ::Type{GRU.Mesh}, def::Dict{Symbol, Any})::GRU.Mes
 		smooth = get_typed!(def, :smoothing, ObjGeom.SmoothNone)
 		id = Symbol(asset_id(shape, sides, Int(smooth)))
 		if GRU.has_resource(engine.renderer, id)
-			info("Reusing $id")
 			return GRU.get_resource(engine.renderer, id)
 		end
 		model =
