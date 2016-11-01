@@ -1,7 +1,7 @@
 module Octree
 
-using Shapes
-using Shapes: intersect, isvalid
+using GRU.Shapes
+using GRU.Shapes: intersect, isvalid
 
 export Tree, add, remove, for_overlapping
 

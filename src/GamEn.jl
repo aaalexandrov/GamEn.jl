@@ -1,13 +1,15 @@
+__precompile__()
 module GamEn
 
 import GRU
-import GLHelper
-import Math3D
 import JSON
-import FTFont
 import ObjGeom
 import GLFW
 import ModernGL
+
+const GLHelper = GRU.GLHelper
+const FTFont = GRU.FTFont
+const Math3D = GRU.Math3D
 
 include("Octree.jl")
 include("Engine.jl")
