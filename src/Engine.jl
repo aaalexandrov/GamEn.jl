@@ -3,7 +3,7 @@ type Engine
 	defs::Dict{Symbol, Any}
 	dataPath::String
 	assets::Dict{Symbol, Any}
-	events::Dict{Symbol, Vector{Function}}
+	events::EventHandlers
 	shouldClose::Bool
 	timePrev::Float64
 	timeNow::Float64
@@ -71,21 +71,6 @@ function run(engine::Engine)
 	end
 end
 
-function add_event(handler::Function, engine::Engine, event::Symbol)
-	handlers = get!(engine.events, event) do; Function[] end
-	push!(handlers, handler)
-end
-
-function remove_event(handler::Function, engine::Engine, event::Symbol)
-	handlers = engine.events[event]
-	filter!(handlers) do h h==handler end
-end
-
-function call_event(engine::Engine, event::Symbol, args...)
-	handlers = get!(engine.events, event) do; Function[] end
-	foreach(handlers) do h h(engine, event, args...) end
-end
-
 asset_path(engine::Engine, path::String) = joinpath(engine.dataPath, path)
 
 asset_id(filename::String, args...) = filename * reduce((v1, v2)->"$(v1)_$v2", "", args)
@@ -105,6 +90,7 @@ function set_typed(val, def::Dict{Symbol, Any}, key::Symbol, dataType::DataType)
 			val = eval(parse(val))
 		end
 		val = dataType(val)
+		def[Symbol(string(key)*"#org")] = def[key] # remember the original value in case we need to resave the json
 		def[key] = val
 	end
 	val
@@ -118,24 +104,57 @@ function resolve_def(engine::Engine, defpath::String, def::Dict{Symbol, Any})
 	def[:defpath] = defpath
 end
 
+function merge_rec!(dst::Associative, src::Associative)
+	for (k, v) in src
+		if !haskey(dst, k)
+			dst[k] = v
+		elseif isa(dst[k], Associative) && isa(v, Associative)
+			merge_rec!(dst[k], v)
+		else
+			@assert dst[k] == v
+		end
+	end
+end
+
+function def_container(engine::Engine, path::Vector{Symbol})
+	container = engine.defs
+	for i = 1:length(path)
+		container = get!(container, path[i]) do; Dict{Symbol, Any}() end
+	end
+	container
+end
+
+function try_load(engine::Engine, path::Vector{Symbol})
+	defname = join(map(string, path), '/')
+	filename = asset_path(engine, defname*".json")
+	if !isfile(filename)
+		return nothing
+	end
+	json = json_load(filename)
+	resolve_def(engine, defname, json)
+	container = def_container(engine, path)
+	merge_rec!(container, json)
+	container
+end
+
 json_load(path::String) = JSON.parsefile(path, dicttype=Dict{Symbol, Any})
 
 function get_def(engine::Engine, defname::String)
 	path = map(Symbol, split(defname, '/'))
-	container = engine.defs
-	for i = 1:length(path)-1
-		container = get!(container, path[i]) do; Dict{Symbol, Any}() end
+	container = def_container(engine, path[1:end-1])
+	if haskey(container, path[end])
+		return container[path[end]]
 	end
-	def = get!(container, path[end]) do
-		filename = asset_path(engine, defname*".json")
-		if !isfile(filename)
-			return nothing
+	# if the def is not present, we start trying to load defs from prefixes of its path, and check if a loaded prefix contains the required key
+	for i = length(path):-1:1
+		loaded = try_load(engine, path[1:i])
+		if loaded != nothing # a def was loaded, now we check if the required key was merged by this def into the container
+			if haskey(container, path[end])
+				return container[path[end]]
+			end
 		end
-		json = json_load(filename)
-		resolve_def(engine, defname, json)
-		json
 	end
-	def
+	nothing
 end
 
 load_def(engine::Engine, defname::String) = load_def(engine, get_def(engine, defname))
@@ -149,6 +168,32 @@ function load_def(engine::Engine, def::Dict{Symbol, Any})
 		def[:instance] = obj
 	end
 	obj
+end
+
+function original_def(def::Dict{Symbol, Any})
+	dst = Dict{Symbol, Any}()
+	for (k,v) in def
+		val = v
+		if k == :instance
+			val = isa(val, Bool)? v : true
+		elseif k == :defpath || endswith(string(k), "#org")
+			continue
+		else
+			orgKey = Symbol(string(k)*"#org")
+			if haskey(def, orgKey)
+				val = def[orgKey]
+			end
+		end
+		if isa(val, Dict{Symbol, Any})
+			val = original_def(val)
+		end
+		dst[k] = val
+	end
+	dst
+end
+
+function save_def(engine::Engine, def::Dict{Symbol, Any}, target::String = def[:defpath])
+	write(asset_path(engine, target*".json"), JSON.json(original_def(def), 2))
 end
 
 function init{T}(engine::Engine, ::Type{T}, def::Dict{Symbol, Any})

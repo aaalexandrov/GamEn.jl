@@ -82,6 +82,7 @@ end
 function init_material(engine::Engine, material::GRU.Material, def::Dict{Symbol, Any})
 	if haskey(def, :uniforms)
 		uniforms = def[:uniforms]
+		get!(def, Symbol("uniforms#org")) do; deepcopy(uniforms) end
 		for (u, v) in uniforms
 			if isa(v, String) || isa(v, Dict)
 				v = load_def(engine, v)
@@ -93,6 +94,7 @@ function init_material(engine::Engine, material::GRU.Material, def::Dict{Symbol,
 	end
 	if haskey(def, :states)
 		states = def[:states]
+		get!(def, Symbol("states#org")) do; copy(states) end
 		for i = 1:length(states)
 			if !isa(states[i], GRU.RenderState)
 				states[i] = eval(parse(states[i]))::GRU.RenderState

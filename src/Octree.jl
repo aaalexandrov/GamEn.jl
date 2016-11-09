@@ -3,7 +3,7 @@ module Octree
 using GRU.Shapes
 using GRU.Shapes: intersect, isvalid
 
-export Tree, add, remove, for_overlapping
+export Tree, add, remove, for_overlapping, getbound
 
 type Node{T}
 	subNodes::Array{Nullable{Node{T}}, 3}
@@ -21,8 +21,7 @@ end
 
 Tree{T, F}(::Type{T}, bound::AABB{F}; minNodeSize::F = F(16), canExpand::Bool = false) = Tree{T, F}(bound, Node{T}(), minNodeSize, canExpand)
 
-function add{T, F}(octree::Tree{T, F}, obj::T)
-	objBound = getbound(obj)
+function add{T, F}(octree::Tree{T, F}, obj::T, objBound::AABB{F})
 	@assert isvalid(objBound)
 	@assert !any(x->isinf(x), objBound.p)
 	if !inside(octree.bound, objBound)
@@ -35,13 +34,14 @@ function add{T, F}(octree::Tree{T, F}, obj::T)
 	end
 	add(octree.root, octree.bound, octree, obj, objBound)
 end
+add{T, F}(octree::Tree{T, F}, obj::T) = add(octree, obj, getbound(obj))
 
-function remove{T, F}(octree::Tree{T, F}, obj::T)
-	objBound = getbound(obj)
-	remove(octree.root, octree.bound, octree, obj, objBound)
-end
+remove{T, F}(octree::Tree{T, F}, obj::T, objBound::AABB{F}) = remove(octree.root, octree.bound, octree, obj, objBound)
+remove{T, F}(octree::Tree{T, F}, obj::T) = remove(octree, obj, getbound(obj))
 
 for_overlapping{T, F}(f::Function, octree::Tree{T, F}, bound::AABB{F}) = for_overlapping(f, octree.root, octree.bound, bound)
+
+getbound(::Any) = nothing # this needs to be overriden by the user
 
 function expand{T, F}(octree::Tree{T, F}, objBound::AABB{F})
 	ind = Int[0, 0, 0]

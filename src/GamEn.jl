@@ -6,11 +6,13 @@ import JSON
 import ObjGeom
 import GLFW
 import ModernGL
+using GRU.Shapes
 
 const GLHelper = GRU.GLHelper
 const FTFont = GRU.FTFont
 const Math3D = GRU.Math3D
 
+include("Events.jl")
 include("Octree.jl")
 include("Engine.jl")
 include("Camera.jl")
