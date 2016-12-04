@@ -6,12 +6,32 @@ type NodeInfo
 end
 
 type World <: NodeObj
-	id::Symbol
 	parent::NodeObj
 	children::Dict{Symbol, BaseObj}
-	engine::Engine
 	octree::Octree.Tree{NodeObj, Float32}
 	nodes::Dict{NodeObj, NodeInfo}
+	id::Symbol
+	engine::Engine
+	renderHandler::Function
+
+	World() = new(NoNode(), Dict{Symbol, BaseObj}(), Octree.Tree{NodeObj, Float32}(), Dict{NodeObj, NodeInfo}())
+end
+
+function init(world::World, engine::Engine, id::Symbol = :world)
+	world.id = id
+	world.engine = engine
+	world.renderHandler = add_event(engine, :render) do owner, event
+		render(world)
+	end
+end
+
+function done(world::World)
+	remove_event(world.renderHandler, engine, :render)
+end
+
+function render(world::World)
+	frustum = getfrustum(world.engine.renderer.camera)
+	
 end
 
 function add_node(world::World, node::NodeObj)

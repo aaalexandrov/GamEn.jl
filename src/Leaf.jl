@@ -1,5 +1,5 @@
 type Spatial <: LeafObj
-	parent::BaseObj
+	parent::NodeObj
 	matLocal::Matrix{Float32}
 	matWorld::Matrix{Float32}
 	version::UInt
@@ -7,8 +7,8 @@ type Spatial <: LeafObj
 	boundLocal::Shape{Float32}
 	boundWorld::Shape{Float32}
 
-	Spatial(parent::Nullable{NodeObj} = Nullable{NodeObj}(), matLocal = eye(Float32, 4), boundLocal::Shape{Float32} = Empty{Float32}()) =
-		new(parent, matLocal, eye(Float32, 4), 1, 0, boundLocal, similar(boundLocal))
+	Spatial(matLocal = eye(Float32, 4), boundLocal::Shape{Float32} = Empty{Float32}()) =
+		new(NoNode(), matLocal, eye(Float32, 4), 1, 0, boundLocal, similar(boundLocal))
 end
 
 get_id(t::Spatial) = :spatial
@@ -59,10 +59,12 @@ end
 
 type Visual <: LeafObj
 	id::Symbol
-	parent::Nullable{NodeObj}
+	parent::NodeObj
 	visual::GRU.Renderable
 	matLocal::Matrix{Float32}
 	parentVersion::UInt
+
+	Visual(id::Symbol, visual::GRU.Renderable, matLocal::Matrix{Float32} = eye(Float32, 4)) = new(id, NoNode(), visual, matLocal, 0)
 end
 
 get_id(v::Visual) = v.id

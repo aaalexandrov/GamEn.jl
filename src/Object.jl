@@ -4,16 +4,19 @@ abstract LeafObj <: BaseObj
 
 abstract NodeObj <: BaseObj
 
+type NoNode <: NodeObj
+end
+
 get_id(obj::BaseObj) = obj.id
 
 function set_parent(child::BaseObj, parent::NodeObj = child)
-	if child.parent != child
+	if child.parent != NoNode()
 		child_removed(child.parent, child)
 		@assert child.parent.children[get_id(child)] == child
 		delete!(child.parent.children, get_id(child))
 	end
 	child.parent = parent
-	if parent != child
+	if parent != NoNode()
 		@assert !haskey(parent.children, get_id(child))
 		parent.children[get_id(child)] = child
 		child_added(child.parent, child)
@@ -22,7 +25,7 @@ end
 
 function top(obj::BaseObj)
 	t = obj
-	while t.parent != t
+	while t.parent != NoNode()
 		t = t.parent
 	end
 	t
@@ -61,4 +64,6 @@ type Object <: NodeObj
 	parent::NodeObj
 	children::Dict{Symbol, BaseObj}
 	events::EventHandlers
+
+	Object(id::Symbol) = new(id, NoNode(), Dict{Symbol, BaseObj}(), EventHandlers())
 end
