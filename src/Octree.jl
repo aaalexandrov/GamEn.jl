@@ -5,11 +5,16 @@ using GRU.Shapes: intersect, isvalid
 
 export Tree, add, remove, for_overlapping, getbound
 
-type Node{T}
-	subNodes::Array{Nullable{Node{T}}, 3}
+abstract OptionalNode{T}
+
+type NullNode{T} <: OptionalNode{T}
+end
+
+type Node{T} <: OptionalNode{T}
+	subNodes::Array{OptionalNode{T}, 3}
 	objects::Array{T, 1}
 
-	Node() = new(fill(Nullable{Node{T}}(), 2, 2, 2), T[])
+	Node() = new(fill(NullNode{T}(), 2, 2, 2), T[])
 end
 
 type Tree{T, F}
@@ -107,26 +112,26 @@ end
 
 function getsubnode{T, F}(node::Node{T}, nodeBound::AABB{F}, octree::Tree{T, F}, objBound::AABB{F}, create::Bool)
 	if create && !cansubdivide(nodeBound, octree)
-		return node, nodeBound
+		return NullNode{T}(), nodeBound
 	end
 	ind = getsubindex(nodeBound, objBound)
 	if length(ind) != 3
-		return node, nodeBound
+		return NullNode{T}(), nodeBound
 	end
 	subNode = node.subNodes[ind...]
-	if isnull(subNode)
+	if subNode == NullNode{T}()
 		if !create
-			return node, nodeBound
+			return NullNode{T}(), nodeBound
 		end
-		subNode = Nullable(Node{T}())
+		subNode = Node{T}()
 		node.subNodes[ind...] = subNode
 	end
-	return get(subNode), getsubbound(nodeBound, ind)
+	return subNode, getsubbound(nodeBound, ind)
 end
 
 function add{T, F}(node::Node{T}, nodeBound::AABB{F}, octree::Tree{T, F}, obj::T, objBound::AABB{F})
 	subNode, subBound = getsubnode(node, nodeBound, octree, objBound, true)
-	if subNode == node
+	if subNode == NullNode{T}()
 		@assert findfirst(node.objects, obj) == 0
 		push!(node.objects, obj)
 	else
@@ -141,7 +146,7 @@ end
 
 function remove{T, F}(node::Node{T}, nodeBound::AABB{F}, octree::Tree{T, F}, obj::T, objBound::AABB{F})
 	subNode, subBound = getsubnode(node, nodeBound, octree, objBound, false)
-	if subNode == node
+	if subNode == NullNode{T}()
 		deleteat_unordered!(node.objects, findfirst(node.objects, obj))
 	else
 		remove(subNode, subBound, octree, obj, objBound)
@@ -155,10 +160,10 @@ function for_overlapping{T, F}(f::Function, node::Node{T}, nodeBound::AABB{F}, b
 		end
 	end
 	for z = 1:2, y = 1:2, x = 1:2
-		if !isnull(node.subNodes[x, y, z])
+		if node.subNodes[x, y, z] != NullNode{T}()
 			subBound = getsubbound(nodeBound, [x, y, z])
 			if intersect(bound, subBound)
-				for_overlapping(f, get(node.subNodes[x, y, z]), subBound, bound)
+				for_overlapping(f, node.subNodes[x, y, z], subBound, bound)
 			end
 		end
 	end

@@ -114,22 +114,7 @@ function init(engine::Engine, ::Type{GRU.Model}, def::Dict{Symbol, Any})::GRU.Mo
 	mesh = load_def(engine, def[:mesh])
 	material = load_def(engine, def[:material])
 	model = GRU.Model(mesh, material)
-	if haskey(def, :transform)
-		GRU.settransform(model, get_typed(def, :transform, Vector{Float32}))
-	else
-		mat = eye(Float32, 4)
-		if haskey(def, :scale)
-			mat = Math3D.scale(get_typed(def, :scale, Vector{Float32}))
-		end
-		if haskey(def, :rot_axis_angle)
-			axis_angle = get_typed(def, :rot_axis_angle, Vector{Float32})
-			mat = Math3D.rot(axis_angle[1:3], axis_angle[4]) * mat
-		end
-		if haskey(def, :position)
-			mat = Math3D.trans(get_typed(def, :position, Vector{Float32})) * mat
-		end
-		GRU.settransform(model, mat)
-	end
+	GRU.settransform(model, get_transform(def))
 	model
 end
 

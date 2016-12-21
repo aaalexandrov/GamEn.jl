@@ -74,6 +74,10 @@ end
 asset_path(engine::Engine, path::String) = joinpath(engine.dataPath, path)
 
 asset_id(filename::String, args...) = filename * reduce((v1, v2)->"$(v1)_$v2", "", args)
+id_count = let count = 0
+	()->count += 1
+end
+next_id(prefix::String) = asset_id(prefix, id_count())
 
 function add_asset(engine::Engine, id::Symbol, val)
 	@assert !haskey(engine.assets, id)
@@ -99,6 +103,27 @@ end
 get_typed(def::Dict{Symbol, Any}, key::Symbol, dataType::DataType) = set_typed(def[key], def, key, dataType)
 get_typed!(default::Function, def::Dict{Symbol, Any}, key::Symbol, dataType::DataType) = set_typed(get!(default, def, key), def, key, dataType)
 get_typed!(def::Dict{Symbol, Any}, key::Symbol, defVal, dataType::DataType = typeof(defVal)) = set_typed(get!(()->defVal, def, key), def, key, dataType)
+
+function get_transform(def::Dict{Symbol, Any})
+	mat = eye(Float32, 4)
+	if haskey(def, :transform)
+		mat[:] = get_typed(def, :transform, Vector{Float32})
+	else
+		if haskey(def, :scale)
+			mat = Math3D.scale(get_typed(def, :scale, Vector{Float32}))
+		end
+		if haskey(def, :rot_axis_angle)
+			axis_angle = get_typed(def, :rot_axis_angle, Vector{Float32})
+			mat = Math3D.rot(axis_angle[1:3], axis_angle[4]) * mat
+		end
+		if haskey(def, :position)
+			mat = Math3D.trans(get_typed(def, :position, Vector{Float32})) * mat
+		end
+	end
+	mat
+end
+
+get_id!(def::Dict{Symbol, Any}, prefix::String = string(def[:type])) = get_typed!(def, :id, Symbol) do; next_id(prefix) end
 
 function resolve_def(engine::Engine, defpath::String, def::Dict{Symbol, Any})
 	def[:defpath] = defpath

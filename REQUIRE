@@ -1,3 +1,5 @@
 julia 0.5
-GRU
 JSON
+GRU
+GLFW
+ObjGeom
