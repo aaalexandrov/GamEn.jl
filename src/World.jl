@@ -1,22 +1,25 @@
-type NodeInfo
-	bound::AABB{Float32}
-	NodeInfo() = new()
+type UpdateInfo
+	transform::Bool
+	bound::Bool
 end
 
-type World <: NodeObj
+type World <: BaseWorld
 	parent::NodeObj
 	children::Dict{Symbol, BaseObj}
 	octree::Octree.Tree{NodeObj, Float32}
-	nodes::Dict{NodeObj, NodeInfo}
+	updates::Dict{NodeObj, UpdateInfo}
 	id::Symbol
 	engine::Engine
 
-	World(engine::Engine, aabb::AABB{Float32}, id::Symbol = :world) = new(NoNode(), Dict{Symbol, BaseObj}(), Octree.Tree(NodeObj, aabb), Dict{NodeObj, NodeInfo}(), id, engine)
+	World(engine::Engine, aabb::AABB{Float32}, id::Symbol = :world) = new(NoNode(), Dict{Symbol, BaseObj}(), Octree.Tree(NodeObj, aabb), Dict{NodeObj, UpdateInfo}(), id, engine)
 end
 
 function init(world::World)
 	add_event(world.engine, :render, world) do owner, event
 		render(world)
+	end
+	add_event(world.engine, :update, world) do owner, event
+		update_registered(world)
 	end
 	world
 end
@@ -34,11 +37,8 @@ function done(world::World)
 end
 
 function render_node(world::World, frustum::Convex{Float32}, node::Octree.Node{NodeObj}, nodeBound::AABB{Float32})
-	#info("render_node $(nodeBound) $(length(node.objects))")
 	outside(frustum, nodeBound) && return
-	#info("render_node rendering")
 	for obj in node.objects
-		#info("render_node $(get_id(obj)) rendering")
 		render(obj, world.engine)
 	end
 	for z = 1:2, y = 1:2, x = 1:2
@@ -55,88 +55,92 @@ function render(world::World)
 	render_node(world, frustum, world.octree.root, world.octree.bound)
 end
 
+add_to_world(world::World, base::BaseObj) = nothing
+function add_to_world(world::World, node::NodeObj)
+	!haskey(node.children, :spatial) && return
+	spatial = node.children[:spatial]
+	worldMat = get_world_transform(node.parent)
+	update_world_transform(spatial, worldMat)
+	update_world_bound(spatial)
+	add_node(world, node)
+end
+
+remove_from_world(world::World, base::BaseObj) = nothing
+function remove_from_world(world::World, node::NodeObj)
+	remove_node(world, node)
+end
+
 function add_node(world::World, node::NodeObj)
-	#info("add_node $(get_id(node))")
-	nodeInfo = world.nodes[node]
-	nodeInfo.bound = getbound(node)
-	if !isempty(nodeInfo.bound)
-		#info("Octree.add $(nodeInfo.bound)")
-		Octree.add(world.octree, node, nodeInfo.bound)
-		#info("Octree.add $(nodeInfo.bound) done")
+	bound = getbound(node)
+	if !isempty(bound)
+		Octree.add(world.octree, node, bound)
 	end
-	#info("add_node $(get_id(node)) done")
 end
 
 function remove_node(world::World, node::NodeObj)
-	#info("remove_node $(get_id(node))")
-	bound = world.nodes[node].bound
+	bound = getbound(node)
 	if !isempty(bound)
 		Octree.remove(world.octree, node, bound)
 	end
 end
 
-function bound_updated(world::World, node::NodeObj)
+function register_transform_update(world::World, node::NodeObj)
+	upd = get!(world.updates, node) do; UpdateInfo(false, false) end
+	upd.transform = true
+end
+
+function register_bound_update(world::World, node::NodeObj)
+	upd = get!(world.updates, node) do; UpdateInfo(false, false) end
+	upd.bound = true
+end
+
+const defUpd = UpdateInfo(false, false)
+
+update_transform(world::BaseWorld, leaf::BaseObj, worldMat::Matrix{Float32}) = nothing
+function update_transform(world::World, node::NodeObj, worldMat::Matrix{Float32})
+	!haskey(node.children, :spatial) && return
 	remove_node(world, node)
+	spatial = node.children[:spatial]
+	upd = get(world.updates, node, defUpd)
+	if upd.transform
+		next_transform(spatial)
+	end
+	update_world_transform(spatial, worldMat)
+	for child in node.children
+		update_transform(world, child, get_world_transform(spatial))
+	end
+	if upd.bound
+		next_bound(spatial)
+		upd.bound = false
+	end
+	update_world_bound(spatial)
 	add_node(world, node)
 end
 
-
-function process_spatial(f::Function, obj::BaseObj)
-	if isa(obj, Spatial)
-		f(obj.parent)
-	else
-		for_children(f, obj, false)
-	end
-end
-
-function child_added(world::World, obj::BaseObj)
-	#info("child_added to world $(get_id(obj))")
-	process_spatial(obj) do c
-		#info("processing $(get_id(c))")
-		world_added(c, world)
-		if has_transform(c)
-			@assert !haskey(world.nodes, c)
-			nodeInfo = NodeInfo()
-			world.nodes[c] = nodeInfo
-			add_node(world, c)
-			add_event(c, :bound_updated, world) do owner, event, spatial
-				#info("bound_updated enter")
-				bound_updated(world, owner)
-				#info("bound_updated exit")
-			end
-			add_event(c, :child_added, world) do owner, event, child
-				child_added(world, child)
-			end
-			add_event(c, :child_removed, world) do owner, event, child
-				child_removed(world, child)
+function update_registered(world::World)
+	updateRoots = Set{NodeObj}()
+	for (node, upd) in world.updates
+		!upd.transform && continue
+		root = node
+		while true
+			node = node.parent
+			node == world && break
+			if haskey(node.children, :spatial) && get(world.updates, node, defUpd).transform
+				root = node
 			end
 		end
-		#info("processing $(get_id(c)) done")
+		push!(updateRoots, root)
 	end
-	#info("child_added to world $(get_id(obj)) done")
-end
-
-function child_removed(world::World, obj::BaseObj)
-	process_spatial(obj) do c
-		world_removed(c, world)
-		if has_transform(c)
-			remove_events(world, c)
-			remove_node(world, c)
-			delete!(world.nodes, c)
-		end
+	for node in updateRoots
+		update_transform(world, node, get_world_transform(node.parent))
 	end
-end
-
-world_added(obj::BaseObj, world::World) = nothing
-world_removed(obj::BaseObj, world::World) = nothing
-
-function world_added(spatial::Spatial, world::World)
-	add_event(world.engine, :update, spatial) do engine, event
-		get_world_transform(spatial)
-		#info(spatial.boundWorld)
+	for (node, upd) in world.updates
+		!upd.bound && continue
+		remove_node(world, node)
+		spatial = node.children[:spatial]
+		next_bound(spatial)
+		update_world_bound(spatial)
+		add_node(world, node)
 	end
-end
-
-function world_removed(spatial::Spatial, world::World)
-	remove_event(world.engine, :update, spatial)
+	empty!(world.updates)
 end

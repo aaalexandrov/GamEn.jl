@@ -1,14 +1,24 @@
+type Data3D
+	mat::Matrix{Float32}
+	bound::Shape{Float32}
+
+	Data3D(bound = empty!(AABB()), mat = eye(Float32, 4)) = new(mat, bound)
+end
+
+function assure_bound_type(data::Data3D, bound::Shape)
+	if typeof(data.bound) != typeof(bound)
+		data.bound = similar(bound)
+	end
+	nothing
+end
+
 type Spatial <: LeafObj
 	parent::NodeObj
-	matLocal::Matrix{Float32}
-	matWorld::Matrix{Float32}
-	version::UInt
-	parentVersion::UInt
-	boundLocal::Shape{Float32}
-	boundWorld::Shape{Float32}
+	local3D::Data3D
+	world3D::Data3D
+	next3D::Data3D
 
-	Spatial(matLocal = eye(Float32, 4), boundLocal::Shape{Float32} = Empty{Float32}()) =
-		new(NoNode(), matLocal, eye(Float32, 4), 1, 0, boundLocal, similar(boundLocal))
+	Spatial(matLocal, boundLocal) = new(NoNode(), Data3D(boundLocal, matLocal), Data3D(similar(boundLocal)), Data3D(similar(boundLocal)))
 end
 
 function init(engine::Engine, ::Type{Spatial}, def::Dict{Symbol, Any})::Spatial
@@ -21,71 +31,44 @@ function init(engine::Engine, ::Type{Spatial}, def::Dict{Symbol, Any})::Spatial
 end
 
 get_id(t::Spatial) = :spatial
-get_local_bound(spatial::Spatial) = spatial.boundLocal
 
-function calc_parent_bound(parent::NodeObj, spatial::Spatial)
-	set_local_bound(spatial, calc_local_bound(parent))
-end
-
-function child_added(parent::NodeObj, spatial::Spatial)
-	invoke(child_added, (typeof(parent), LeafObj), parent, spatial)
-	add_event(parent, :child_added, spatial) do owner, event, child
-		calc_parent_bound(owner, spatial)
-	end
-	set_local_bound(spatial, calc_local_bound(parent))
-end
-
-function child_removed(parent::NodeObj, spatial::Spatial)
-	remove_event(spatial, parent, :child_added)
-	invoke(child_removed, (typeof(parent), LeafObj), parent, spatial)
-end
-
-function update_bound(spatial::Spatial)
-	transform(spatial.boundWorld, spatial.matWorld, spatial.boundLocal)
-	call_event(spatial.parent, :bound_updated, spatial)
-end
-
-function update_transform(spatial::Spatial)
-	parentVer, parentWorld = get_world_transform(spatial.parent.parent)
-	if parentVer > spatial.parentVersion
-		A_mul_B!(spatial.matWorld, parentWorld, spatial.matLocal)
-		spatial.version += 1
-		spatial.parentVersion = parentVer
-		update_bound(spatial)
-	end
-end
-
-function get_world_transform(node::NodeObj)
-	!haskey(node.children, :spatial) && return 1, eye(Float32, 4)
-	get_world_transform(node.children[:spatial])
-end
-
-function get_world_transform(spatial::Spatial)
-	update_transform(spatial)
-	spatial.version, spatial.matWorld
-end
-
+get_local_transform(spatial::Spatial) = spatial.local3D.mat
 function set_local_transform(spatial::Spatial, m::Matrix{Float32})
-	spatial.matLocal[:] = m
-	spatial.version += 1
-	spatial.parentVersion = 0
+	spatial.next3D[:] = m
+	world = top(spatial)
+	!isa(world, BaseWorld) && return
+	register_transform_update(world, spatial.parent)
 	nothing
 end
 
+get_local_bound(spatial::Spatial) = spatial.local3D.bound
 function set_local_bound(spatial::Spatial, bound::Shape{Float32})
-	#info("set_local_bound spatial")
-	spatial.boundLocal = bound
-	if typeof(spatial.boundWorld) != typeof(spatial.boundLocal)
-		spatial.boundWorld = similar(spatial.boundLocal)
-	end
-	spatial.version += 1
-	spatial.parentVersion = 0
+	spatial.next3D.bound = bound
+	world = top(spatial)
+	!isa(world, BaseWorld) && return
+	register_bound_update(world, spatial.parent)
 	nothing
 end
 
-function get_world_bound(spatial::Spatial)
-	update_transform(spatial)
-	spatial.boundWorld
+get_world_transform(spatial::Spatial) = spatial.world3D.mat
+get_world_bound(spatial::Spatial) = spatial.world3D.bound
+
+function next_transform(spatial::Spatial)
+	spatial.local3D.mat[:] = spatial.next3D.mat
+end
+
+function next_bound(spatial::Spatial)
+	assure_bound_type(spatial.local3D, spatial.next3D.bound)
+	assign(spatial.local3D.bound, spatial.next3D.bound)
+end
+
+function update_world_transform(spatial::Spatial, worldMat::Matrix{Float32})
+	A_mul_B!(spatial.world3D.mat, worldMat, spatial.local3D.mat)
+end
+
+function update_world_bound(spatial::Spatial)
+	assure_bound_type(spatial.world3D, spatial.local3D.bound)
+	transform(spatial.world3D.bound, spatial.world3D.mat, spatial.local3D.bound)
 end
 
 
@@ -94,9 +77,8 @@ type Visual <: LeafObj
 	parent::NodeObj
 	visual::GRU.Renderable
 	matLocal::Matrix{Float32}
-	parentVersion::UInt
 
-	Visual(id::Symbol, visual::GRU.Renderable, matLocal::Matrix{Float32} = eye(Float32, 4)) = new(id, NoNode(), visual, matLocal, 0)
+	Visual(id::Symbol, visual::GRU.Renderable, matLocal::Matrix{Float32} = eye(Float32, 4)) = new(id, NoNode(), visual, matLocal)
 end
 
 function init(engine::Engine, ::Type{Visual}, def::Dict{Symbol, Any})::Visual
@@ -108,18 +90,11 @@ function init(engine::Engine, ::Type{Visual}, def::Dict{Symbol, Any})::Visual
 end
 
 get_id(v::Visual) = v.id
-function get_local_bound(v::Visual)
-	bound = transform(v.matLocal, GRU.localbound(v.visual))
-	#info("get_local_bound $bound")
-	bound
-end
+get_local_bound(v::Visual) = transform(v.matLocal, GRU.localbound(v.visual))
 
 function update(v::Visual)
-	parentVer, parentWorld = get_world_transform(v.parent)
-	if parentVer > v.parentVersion
-		GRU.settransform(v.visual, parentWorld * v.matLocal)
-		v.parentVersion = parentVer
-	end
+	parentWorld = get_world_transform(v.parent)
+	GRU.settransform(v.visual, parentWorld * v.matLocal)
 end
 
 function render(v::Visual, engine::Engine)
