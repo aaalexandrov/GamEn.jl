@@ -5,7 +5,7 @@ using GRU.Shapes: intersect, isvalid
 
 export Tree, add, remove, for_overlapping, getbound
 
-abstract OptionalNode{T}
+abstract type OptionalNode{T} end
 
 type NullNode{T} <: OptionalNode{T}
 end
@@ -14,7 +14,7 @@ type Node{T} <: OptionalNode{T}
 	subNodes::Array{OptionalNode{T}, 3}
 	objects::Array{T, 1}
 
-	Node() = new(fill(NullNode{T}(), 2, 2, 2), T[])
+	Node{T}() where T = new(fill(NullNode{T}(), 2, 2, 2), T[])
 end
 
 type Tree{T, F}

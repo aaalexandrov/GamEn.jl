@@ -1,10 +1,10 @@
-abstract BaseObj
+abstract type BaseObj end
 
-abstract LeafObj <: BaseObj
+abstract type LeafObj <: BaseObj end
 
-abstract NodeObj <: BaseObj
+abstract type NodeObj <: BaseObj end
 
-abstract BaseWorld <: NodeObj
+abstract type BaseWorld <: NodeObj end
 
 type NoNode <: NodeObj
 end

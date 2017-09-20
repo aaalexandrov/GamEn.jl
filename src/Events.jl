@@ -3,7 +3,7 @@ immutable HandlerData
 	func::Function
 end
 
-typealias EventHandlers Dict{Symbol, Vector{HandlerData}}
+EventHandlers = Dict{Symbol, Vector{HandlerData}}
 
 get_events(owner) = owner.events
 

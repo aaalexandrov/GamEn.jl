@@ -1,4 +1,4 @@
-abstract AbstractCamera
+abstract type AbstractCamera end
 
 type FreeCamera <: AbstractCamera
 	deltaTrans::Vector{Float32}
@@ -15,8 +15,8 @@ function update(cam::GRU.Camera, trans::Vector{Float32}, angles::Vector{Float32}
 end
 
 function process_input(engine::Engine, cam::FreeCamera)
-	trans = Array(Float32, 3)
-	angles = Array(Float32, 3)
+	trans = Array{Float32}(3)
+	angles = Array{Float32}(3)
 	deltaTime = deltatime(engine)
 
 	trans[1] = (GLFW.GetKey(engine.window, GLFW.KEY_D) - GLFW.GetKey(engine.window, GLFW.KEY_A)) * cam.deltaTrans[1] * deltaTime
