@@ -8,6 +8,8 @@ import GLFW
 import ModernGL
 using GRU.Shapes
 
+using LinearAlgebra
+
 const GLHelper = GRU.GLHelper
 const FTFont = GRU.FTFont
 const Math3D = GRU.Math3D

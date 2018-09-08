@@ -1,6 +1,6 @@
 abstract type AbstractCamera end
 
-type FreeCamera <: AbstractCamera
+mutable struct FreeCamera <: AbstractCamera
 	deltaTrans::Vector{Float32}
 	deltaAngles::Vector{Float32}
 
@@ -8,15 +8,15 @@ type FreeCamera <: AbstractCamera
 end
 
 function update(cam::GRU.Camera, trans::Vector{Float32}, angles::Vector{Float32})
-	m = eye(Float32, 4, 4)
+	m = Matrix{Float32}(I, 4, 4)
 	Math3D.rotxyz(m, angles...)
 	Math3D.trans(m, trans)
 	GRU.settransform(cam, GRU.gettransform(cam)*m)
 end
 
 function process_input(engine::Engine, cam::FreeCamera)
-	trans = Array{Float32}(3)
-	angles = Array{Float32}(3)
+	trans = Array{Float32}(undef, 3)
+	angles = Array{Float32}(undef, 3)
 	deltaTime = deltatime(engine)
 
 	trans[1] = (GLFW.GetKey(engine.window, GLFW.KEY_D) - GLFW.GetKey(engine.window, GLFW.KEY_A)) * cam.deltaTrans[1] * deltaTime

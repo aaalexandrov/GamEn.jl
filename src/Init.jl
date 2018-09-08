@@ -1,6 +1,6 @@
 function init(renderer::GRU.Renderer, def::Dict{Symbol, Any})
 	if haskey(def, :clear_color)
-		GRU.set_clear_color(renderer, (def[:clear_color]...))
+		GRU.set_clear_color(renderer, (def[:clear_color]...,))
 	end
 	if haskey(def, :clear_stencil)
 		GRU.set_clear_stencil(renderer, def[:clear_stencil])
@@ -97,7 +97,7 @@ function init_material(engine::Engine, material::GRU.Material, def::Dict{Symbol,
 		get!(def, Symbol("states#org")) do; copy(states) end
 		for i = 1:length(states)
 			if !isa(states[i], GRU.RenderState)
-				states[i] = eval(parse(states[i]))::GRU.RenderState
+				states[i] = eval(Meta.parse(states[i]))::GRU.RenderState
 			end
 			GRU.setstate(material, states[i])
 		end
@@ -123,7 +123,7 @@ function init(engine::Engine, ::Type{GRU.Font}, def::Dict{Symbol, Any})::GRU.Fon
 	sizeXY = get(def, :sizexy, (32, 32))
 	faceIndex = get(def, :faceindex, 0)
 	chars = get(def, :chars, '\u0000':'\u00ff')
-	ftFont = FTFont.loadfont(asset_path(engine, facename), sizeXY = (sizeXY...), faceIndex = faceIndex, chars = chars)
+	ftFont = FTFont.loadfont(asset_path(engine, facename), sizeXY = (sizeXY...,), faceIndex = faceIndex, chars = chars)
 
 	shader = load_def(engine, def[:shader])
 	positionFunc = get_typed!(def, :positionfn, GRU.position_func(:position))

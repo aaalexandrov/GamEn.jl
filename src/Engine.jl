@@ -1,4 +1,4 @@
-type Engine
+mutable struct Engine
 	renderer::GRU.Renderer
 	defs::Dict{Symbol, Any}
 	dataPath::String
@@ -73,7 +73,7 @@ end
 
 asset_path(engine::Engine, path::String) = joinpath(engine.dataPath, path)
 
-asset_id(filename::String, args...) = filename * reduce((v1, v2)->"$(v1)_$v2", "", args)
+asset_id(filename::String, args...) = filename * reduce((v1, v2)->"$(v1)_$v2", args; init = "")
 id_count = let count = 0
 	()->count += 1
 end
@@ -91,9 +91,11 @@ end
 function set_typed(val, def::Dict{Symbol, Any}, key::Symbol, dataType::DataType)
 	if !isa(val, dataType)
 		if isa(val, String) && !(dataType <: AbstractString || dataType == Symbol)
-			val = eval(parse(val))
+			val = eval(Meta.parse(val))
 		end
-		val = dataType(val)
+		if !isa(val, dataType)
+			val = dataType(val)
+		end
 		def[Symbol(string(key)*"#org")] = def[key] # remember the original value in case we need to resave the json
 		def[key] = val
 	end
@@ -105,7 +107,7 @@ get_typed!(default::Function, def::Dict{Symbol, Any}, key::Symbol, dataType::Dat
 get_typed!(def::Dict{Symbol, Any}, key::Symbol, defVal, dataType::DataType = typeof(defVal)) = set_typed(get!(()->defVal, def, key), def, key, dataType)
 
 function get_transform(def::Dict{Symbol, Any})
-	mat = eye(Float32, 4)
+	mat = Matrix{Float32}(I, 4, 4)
 	if haskey(def, :transform)
 		mat[:] = get_typed(def, :transform, Vector{Float32})
 	else
@@ -129,7 +131,7 @@ function resolve_def(engine::Engine, defpath::String, def::Dict{Symbol, Any})
 	def[:defpath] = defpath
 end
 
-function merge_rec!(dst::Associative, src::Associative)
+function merge_rec!(dst::AbstractDict, src::AbstractDict)
 	for (k, v) in src
 		if !haskey(dst, k)
 			dst[k] = v
@@ -200,7 +202,7 @@ function original_def(def::Dict{Symbol, Any})
 	for (k,v) in def
 		val = v
 		if k == :instance
-			val = isa(val, Bool)? v : true
+			val = isa(val, Bool) ? v : true
 		elseif k == :defpath || endswith(string(k), "#org")
 			continue
 		else
@@ -221,7 +223,7 @@ function save_def(engine::Engine, def::Dict{Symbol, Any}, target::String = def[:
 	write(asset_path(engine, target*".json"), JSON.json(original_def(def), 2))
 end
 
-function init{T}(engine::Engine, ::Type{T}, def::Dict{Symbol, Any})
+function init(engine::Engine, ::Type{T}, def::Dict{Symbol, Any}) where T
 	obj = T()
 	for i = 1:nfields(T)
 		field = fieldname(T, i)

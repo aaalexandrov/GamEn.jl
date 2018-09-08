@@ -1,8 +1,8 @@
-type Data3D
+mutable struct Data3D
 	mat::Matrix{Float32}
 	bound::Shape{Float32}
 
-	Data3D(bound = empty!(AABB()), mat = eye(Float32, 4)) = new(mat, bound)
+	Data3D(bound = empty!(AABB()), mat = Matrix{Float32}(I, 4, 4)) = new(mat, bound)
 end
 
 function assure_bound_type(data::Data3D, bound::Shape)
@@ -12,7 +12,7 @@ function assure_bound_type(data::Data3D, bound::Shape)
 	nothing
 end
 
-type Spatial <: LeafObj
+mutable struct Spatial <: LeafObj
 	parent::NodeObj
 	local3D::Data3D
 	world3D::Data3D
@@ -63,7 +63,7 @@ function next_bound(spatial::Spatial)
 end
 
 function update_world_transform(spatial::Spatial, worldMat::Matrix{Float32})
-	A_mul_B!(spatial.world3D.mat, worldMat, spatial.local3D.mat)
+	spatial.world3D.mat = worldMat * spatial.local3D.mat
 end
 
 function update_world_bound(spatial::Spatial)
@@ -72,13 +72,13 @@ function update_world_bound(spatial::Spatial)
 end
 
 
-type Visual <: LeafObj
+mutable struct Visual <: LeafObj
 	id::Symbol
 	parent::NodeObj
 	visual::GRU.Renderable
 	matLocal::Matrix{Float32}
 
-	Visual(id::Symbol, visual::GRU.Renderable, matLocal::Matrix{Float32} = eye(Float32, 4)) = new(id, NoNode(), visual, matLocal)
+	Visual(id::Symbol, visual::GRU.Renderable, matLocal::Matrix{Float32} = Matrix{Float32}(I, 4, 4)) = new(id, NoNode(), visual, matLocal)
 end
 
 function init(engine::Engine, ::Type{Visual}, def::Dict{Symbol, Any})::Visual

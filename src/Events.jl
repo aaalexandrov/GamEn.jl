@@ -1,4 +1,4 @@
-immutable HandlerData
+struct HandlerData
 	user::Any
 	func::Function
 end
@@ -32,11 +32,11 @@ function remove_events(user, owner)
 end
 
 function call_event(owner, event::Symbol, args...)
-	#info("call_event $(get_id(owner)) $event")
+	#@info("call_event $(get_id(owner)) $event")
 	handlers = get!(get_events(owner), event) do; Function[] end
 	for h in handlers
 		h.func(owner, event, args...)
 	end
-	#info("call_event $(get_id(owner)) $event done")
+	#@info("call_event $(get_id(owner)) $event done")
 	nothing
 end

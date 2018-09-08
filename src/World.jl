@@ -1,9 +1,9 @@
-type UpdateInfo
+mutable struct UpdateInfo
 	transform::Bool
 	bound::Bool
 end
 
-type World <: BaseWorld
+mutable struct World <: BaseWorld
 	parent::NodeObj
 	children::Dict{Symbol, BaseObj}
 	octree::Octree.Tree{NodeObj, Float32}
@@ -26,7 +26,7 @@ end
 
 function init(engine::Engine, ::Type{World}, def::Dict{Symbol, Any})::World
 	id = get_id!(def)
-	bound = haskey(def, :bound)? load_def(engine, def[:bound]) : AABB{Float32}([-256f0 256f0; -256f0 256f0; -256f0 256f0])
+	bound = haskey(def, :bound) ? load_def(engine, def[:bound]) : AABB{Float32}([-256f0 256f0; -256f0 256f0; -256f0 256f0])
 	world = init(World(engine, bound, id))
 	init_children(engine, world, def)
 	world
@@ -42,8 +42,8 @@ function render_node(world::World, frustum::Convex{Float32}, node::Octree.Node{N
 		render(obj, world.engine)
 	end
 	for z = 1:2, y = 1:2, x = 1:2
-		if node.subNodes[x, y, z] != Octree.NullNode{NodeObj}()
-			subBound = getsubbound(nodeBound, [x, y, z])
+		if !isa(node.subNodes[x, y, z], Octree.NullNode{NodeObj})
+			subBound = Octree.getsubbound(nodeBound, [x, y, z])
 			render_node(world, frustum, node.subNodes[x, y, z], subBound)
 		end
 	end

@@ -6,19 +6,19 @@ abstract type NodeObj <: BaseObj end
 
 abstract type BaseWorld <: NodeObj end
 
-type NoNode <: NodeObj
+mutable struct NoNode <: NodeObj
 end
 
 get_id(obj::BaseObj) = obj.id
 
 function set_parent(child::BaseObj, parent::NodeObj = NoNode())
-	if child.parent != NoNode()
+	if !isa(child.parent, NoNode)
 		removing_child(parent, child)
 		@assert child.parent.children[get_id(child)] == child
 		delete!(child.parent.children, get_id(child))
 	end
 	child.parent = parent
-	if parent != NoNode()
+	if !isa(parent, NoNode)
 		@assert !haskey(parent.children, get_id(child))
 		parent.children[get_id(child)] = child
 		added_child(parent, child)
@@ -30,7 +30,7 @@ removing_child(parent::NodeObj, child::BaseObj) = nothing
 
 function top(obj::BaseObj)
 	t = obj
-	while t.parent != NoNode()
+	while !isa(t.parent, NoNode)
 		t = t.parent
 	end
 	t
@@ -66,7 +66,7 @@ render(leaf::LeafObj, engine::Engine) = nothing
 get_local_bound(obj::LeafObj) = Empty{Float32}()
 
 function get_local_transform(node::NodeObj)
-	!haskey(node.children, :spatial) && return eye(Float32, 4)
+	!haskey(node.children, :spatial) && return Matrix{Float32}(I, 4, 4)
 	get_local_transform(node.children[:spatial])
 end
 
@@ -80,8 +80,8 @@ function calc_local_bound(node::NodeObj, leafOnly::Bool = true)
 	for (id, c) in node.children
 		leafOnly && !isa(c, LeafObj) && continue
 		localBound = get_local_bound(c)
-		localBound == Empty{Float32}() && continue
-		if bound == Empty{Float32}()
+		isa(localBound, Empty) && continue
+		if isa(bound, Empty)
 			bound = localBound
 		else
 			union!(bound, localBound)
@@ -91,7 +91,7 @@ function calc_local_bound(node::NodeObj, leafOnly::Bool = true)
 end
 
 function get_world_transform(node::NodeObj)
-	!haskey(node.children, :spatial) && return eye(Float32, 4)
+	!haskey(node.children, :spatial) && return Matrix{Float32}(I, 4, 4)
 	get_world_transform(node.children[:spatial])
 end
 
@@ -104,7 +104,7 @@ import .Octree.getbound
 getbound(obj::NodeObj) = convert(AABB{Float32}, get_world_bound(obj))
 
 
-type Object <: NodeObj
+mutable struct Object <: NodeObj
 	id::Symbol
 	parent::NodeObj
 	children::Dict{Symbol, BaseObj}
