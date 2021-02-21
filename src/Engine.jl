@@ -7,19 +7,24 @@ mutable struct Engine
 	shouldClose::Bool
 	timePrev::Float64
 	timeNow::Float64
+	api::Symbol
+	apiVersion::Tuple{Int, Int}
 	window::GLFW.Window
 
 	function Engine(dataPath::String)
 		now = time()
-		new(GRU.Renderer(), Dict{Symbol, Any}(), dataPath, Dict{Symbol, Any}(), Dict{Symbol, Vector{Function}}(), false, now, now)
+		new(GRU.Renderer(), Dict{Symbol, Any}(), dataPath, Dict{Symbol, Any}(), Dict{Symbol, Vector{Function}}(), false, now, now, :none, (0, 0))
 	end
 end
 
 init(engine::Engine, defname::String) = init(engine, json_load(asset_path(engine, defname*".json")))
 
 function init(engine::Engine, def::Dict{Symbol, Any} = Dict{Symbol, Any}())
+	init_api(engine, def)
 	init_window(engine, def)
 	GRU.init(engine.renderer)
+	preamble = get(def, :shader_preamble) do; get_shader_preamble(engine) end
+	GRU.set_shader_preamble(engine.renderer, preamble)
 	init(engine.renderer, def)
 	FTFont.init()
 	GLHelper.gl_info()
@@ -34,6 +39,30 @@ function done(engine::Engine)
 	FTFont.done()
 	GRU.done(engine.renderer)
 	done_window(engine)
+end
+
+function init_api(engine::Engine, def::Dict{Symbol, Any})
+	api = (Sys.islinux() && Sys.ARCH == :arm) ? :gles : :gl
+	engine.api = get(def, :api, api)
+	local ver
+	if api == :gl
+		ver = (3, 3)
+	elseif api == :gles
+		ver = (3, 0)
+	else
+		ver = (0, 0)
+	end
+	engine.apiVersion = map(Int, get(def, :api_version, ver))
+end
+
+function get_shader_preamble(engine::Engine)
+	preamble =
+		"""
+		#version $(engine.apiVersion[1])$(engine.apiVersion[2])0 $(engine.api == :gles ? "es" : "")
+		precision mediump float;
+		
+		"""
+	Vector{UInt8}(preamble)
 end
 
 should_close(engine::Engine) = engine.shouldClose || GLFW.WindowShouldClose(engine.window)
