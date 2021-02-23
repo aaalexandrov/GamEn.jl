@@ -89,7 +89,7 @@ function init_material(engine::Engine, material::GRU.Material, def::Dict{Symbol,
 				uniforms[u] = v
 			end
 			varType = uniform_type(material.shader.uniforms[u].varType)
-			GRU.setuniform(material, u, varType(v))
+			GRU.setuniform(material, u, convert(varType, v))
 		end
 	end
 	if haskey(def, :states)
