@@ -2,7 +2,7 @@ function init_window(engine::Engine, def::Dict{Symbol, Any})
 	GLFW.Init()
 	GLFW.WindowHint(GLFW.DEPTH_BITS, get(def, :depth_bits, 24))
 	GLFW.WindowHint(GLFW.STENCIL_BITS, get(def, :stencil_bits, 8))
-	local ctx
+	local ctx, api
 	if engine.api == :gl
 		api = GLFW.OPENGL_API
 		ctx = GLFW.NATIVE_CONTEXT_API
