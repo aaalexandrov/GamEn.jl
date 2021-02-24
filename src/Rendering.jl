@@ -6,7 +6,7 @@ function init_window(engine::Engine, def::Dict{Symbol, Any})
 	if engine.api == :gl
 		api = GLFW.OPENGL_API
 		ctx = GLFW.NATIVE_CONTEXT_API
-	elseif api == :gles
+	elseif engine.api == :gles
 		api = GLFW.OPENGL_ES_API
 		ctx = GLFW.EGL_CONTEXT_API
 	else
