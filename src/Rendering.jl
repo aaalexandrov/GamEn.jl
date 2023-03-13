@@ -2,18 +2,15 @@ function init_window(engine::Engine, def::Dict{Symbol, Any})
 	GLFW.Init()
 	GLFW.WindowHint(GLFW.DEPTH_BITS, get(def, :depth_bits, 24))
 	GLFW.WindowHint(GLFW.STENCIL_BITS, get(def, :stencil_bits, 8))
-	local ctx, api
+	local api
 	if engine.api == :gl
 		api = GLFW.OPENGL_API
-		ctx = GLFW.NATIVE_CONTEXT_API
 	elseif engine.api == :gles
 		api = GLFW.OPENGL_ES_API
-		ctx = GLFW.EGL_CONTEXT_API
 	else
 		api = GLFW.NO_API
 	end
 	GLFW.WindowHint(GLFW.CLIENT_API, api)
-	GLFW.WindowHint(GLFW.CONTEXT_CREATION_API, ctx)
 	ver = map(Int, get(def, :api_version, engine.apiVersion))
 	GLFW.WindowHint(GLFW.CONTEXT_VERSION_MAJOR, ver[1])
 	GLFW.WindowHint(GLFW.CONTEXT_VERSION_MINOR, ver[2])

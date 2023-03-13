@@ -42,7 +42,7 @@ function done(engine::Engine)
 end
 
 function init_api(engine::Engine, def::Dict{Symbol, Any})
-	api = (Sys.islinux() && Sys.ARCH == :arm) ? :gles : :gl
+	api = (Sys.islinux() && (Sys.ARCH == :arm || Sys.ARCH == :aarch64)) ? :gles : :gl
 	engine.api = get(def, :api, api)
 	local ver
 	if api == :gl
