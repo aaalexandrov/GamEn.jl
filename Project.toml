@@ -1,7 +1,7 @@
 name = "GamEn"
 uuid = "529167a9-b6e6-5d4b-b898-02cc9d025673"
 authors = ["A. Alexandrov <greyalex2003@yahoo.com>"]
-version = "0.1.5"
+version = "0.1.6"
 
 [deps]
 GLFW = "f7f18e0c-5ee9-5ccd-a5bf-e8befd85ed98"
